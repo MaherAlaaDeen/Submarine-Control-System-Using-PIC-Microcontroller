@@ -849,6 +849,8 @@ void main()
 
 ![Internal Result](10.png)
 
+## Submarine System Using PLC
+### Ladder Diagram Code
 
 
 
