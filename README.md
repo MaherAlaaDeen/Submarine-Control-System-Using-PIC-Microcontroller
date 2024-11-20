@@ -474,9 +474,184 @@ A described system utilizes a PIC16F877A microcontroller as the central control 
             Lcd_Write_String("System is OFF");
         }
 ```
-## Simulation Result
+### Simulation Result
 
 ![Motion result](6.png)
+
+## Threat Detection System Using PIC
+### Schematic
+
+![threat](7.png)
+
+A submarine's threat detection system is essential for identifying and responding to potential dangers in its environment. It uses a combination of sensors, such as sonar, radar, periscopes, and passive listening devices, to detect vessels, aircraft, or objects. These sensors gather data, which is processed by advanced computer systems to quickly identify threats and provide actionable information to the crew. Submarines can use decoys or countermeasures to evade threats. Constant advancements ensure the system adapts to new challenges.
+
+The schematic describes a threat detection system using a PIC16F877A microcontroller. It integrates a PIR motion sensor to detect movement and a temperature sensor to identify heat-emitting threats, such as engines or weapons. The microcontroller processes sensor data, displays outputs on an LCD, and triggers alarms like a buzzer when threats are detected. The system includes a switch for power control and is applicable in various security scenarios. Its design ensures effective detection and response to potential threats.
+
+### Code
+#### Preprocessor Directives
+```c
+#include<stdlib.h>
+#include<stdio.h>
+#include<xc.h>
+#include<pic16f877a.h>
+#define _XTAL_FREQ 4000000
+```
+
+#### Pin Definitions
+```c
+#define RS RD2
+#define EN RD3
+#define D4 RD4
+#define D5 RD5
+#define D6 RD6
+#define D7 RD7
+```
+
+#### Include other libraries
+```c
+#include "lcd.h"
+#include "adc.h"
+#include "delay.h"
+#include "stdutils.h"
+```
+
+#### Main Function
+```c
+void main()
+{
+    float a;
+    float volt;
+    char s[0];
+```
+
+#### Set Pin Directions (TRIS Register)
+```c
+    TRISB0=1;  // PIR input
+    TRISB1=1;  // TURN ON
+    TRISB2=1;  // TURN OFF
+    TRISB3=0;  // GREEN LED
+    TRISB4=0;  // RED LED
+    TRISD=0;   // LCD CONFIGURATION
+    TRISD0=0;  // BUZZER
+    TRISA0=1;  // LM35 INPUT
+```
+
+#### Initialize LCD and ADC
+```c
+    Lcd_Init();
+    ADC_Init();
+```
+
+#### Initial State Setup
+```c
+    RB1=0;
+    RB2=0;
+    RB3=0;
+    RB4=1;
+    Lcd_Set_Cursor(1,1);
+    Lcd_Write_String("System OFF");
+```
+
+#### Main Loop
+```c
+    while(1)
+    {
+```
+
+#### System ON Condition
+```c
+        if(RB1==1)
+        {
+            RB3=1;
+            RB4=0;
+            Lcd_Clear();
+            a=ADC_GetAdcValue(0);
+            volt=((a*5)/1023)*100;
+            Lcd_Set_Cursor(2,1);
+            Lcd_Write_String("Temp=");
+            Lcd_Set_Cursor(2,7);
+            sprintf(s,"%f",volt);
+            Lcd_Write_String(s);
+            __delay_ms(1000);
+            Lcd_Clear();
+```
+
+#### Motion Detection and System Response
+```c
+            if(RB0==1)
+            {
+                RD0=1;
+                Lcd_Set_Cursor(1,1);
+                Lcd_Write_String("Motion Detected");
+                __delay_ms(500);
+                Lcd_Clear();
+                if(volt>=50)
+                {
+                    __delay_ms(500);
+                    Lcd_Clear();
+                    Lcd_Set_Cursor(1,1);
+                    Lcd_Write_String("Danger!!!");
+                    __delay_ms(1000);
+                    Lcd_Set_Cursor(2,1);
+                    Lcd_Write_String("Turn Shield ON");
+                    __delay_ms(1000);
+                }
+            }
+```
+- if(RB0==1): If the PIR motion sensor detects motion (RB0 is high).
+- RD0=1: Turn on the buzzer to signal motion detection.
+- Lcd_Write_String("Motion Detected"): Display "Motion Detected" on the LCD.
+- if(volt>=50): If the temperature exceeds 50°C, consider it a danger condition.
+- Lcd_Write_String("Danger!!!"): Display "Danger!!!" on the LCD.
+- Lcd_Write_String("Turn Shield ON"): Display "Turn Shield ON" to indicate a protective action.
+
+#### No Motion Detected
+```c
+            else if(RB0==0)
+            {
+                RD0=0;
+                Lcd_Set_Cursor(1,1);
+                Lcd_Write_String("No Motion");
+                __delay_ms(500);
+                Lcd_Clear();
+            }
+```
+- else if(RB0==0): If no motion is detected.
+- RD0=0: Turn off the buzzer.
+- Lcd_Write_String("No Motion"): Display "No Motion" on the LCD.
+
+#### System OFF Condition
+```c
+        if(RB1==0)
+        {
+            RB1=0;
+            __delay_ms(2000);
+            RB3=0;
+            RB4=1;
+            Lcd_Clear();
+            Lcd_Set_Cursor(1,1);
+            Lcd_Write_String("System OFF");
+        }
+```
+
+#### End of Main Loop
+```c
+        else
+        {
+            RB4=1;
+            RB3=0;
+            Lcd_Clear();
+            Lcd_Set_Cursor(1,1);
+            Lcd_Write_String("SYSTEM OFF");
+        }
+    }
+}
+```
+
+## Simulation result
+
+![Threat Result](8.png)
+
 
 
 
