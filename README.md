@@ -153,7 +153,158 @@ Distance (cm) = Time (µs) / 58.82
 - - The LCD displays "SONAR OFF.".
   - The Red LED turns on, and the Green LED turns off.
 
- 
+## Simulation Result
+
+![Sonar Result](2.png)
+
+## Radar Using PIC
+### Schematic
+
+![Radar Schematic](3.png)
+
+A submarine radar system uses radio waves to detect objects above the water's surface, such as vessels or aircraft, determining their location, speed, and direction. Unlike sonar, which operates underwater using sound waves, radar is crucial for navigation, intelligence gathering, and threat detection. Modern radar systems employ advanced signal processing for accurate environmental data.
+
+The described system uses a PIC16F877A microcontroller to control an ultrasonic sensor mounted on a DC motor, enabling 360-degree object detection. A switch powers the system, and an LCD displays object location data. The ultrasonic sensor measures distance and direction by emitting sound waves that bounce off objects. The motor's rotation expands the sensor's field of view, making the system suitable for applications like surveillance and obstacle detection.
+
+## Code
+### Header Files and Configuration
+
+```c
+#include<stdio.h>
+#include<stdlib.h>
+#include<pic16f877a.h>
+#include<xc.h>
+#define _XTAL_FREQ 4000000
+#include "lcd.h"
+#include "adc.h"
+#include "delay.h"
+#include "pwm.h"
+#include "stdutils.h"
+```
+### Pin Definitions
+
+```c
+#define RS RD2
+#define EN RD3
+#define D4 RD4
+#define D5 RD5
+#define D6 RD6
+#define D7 RD7
+```
+
+### Initializzation
+
+```c
+void main()
+{
+    TRISA0=1;
+    TRISC1=0;
+    TRISB2=1;//TURN ON/OFF
+    TRISB3=0;//GREEN LED
+    TRISB4=0;//RED LED 
+    TRISD=0;
+    int a;
+    TRISB0=0;//trigger
+    TRISB1=1;//echo
+    Lcd_Init();
+    Lcd_Set_Cursor(1,1);
+    Lcd_Write_String("RADAR OFF");
+    RB3=0;
+    RB4=1;
+    RC1=0;
+    T1CON=0x10;
+```
+
+### Main Loop
+
+```c
+while(1)
+    {
+        if(RB2==1)
+        {
+            RB3=1;
+            RB4=0;
+            TMR1H=0;
+            TMR1L=0;
+            RB0=1;
+            __delay_us(10);
+            RB0=0;
+            TMR1ON=1;//Timer starts
+            Lcd_Clear();
+            while(RB1);
+            TMR1ON=0;
+            a=(TMR1L|(TMR1H<<8));
+            a=a/58.82;
+            RC1=1;
+            if(a>=2 && a<=400)
+            {
+                Lcd_Set_Cursor(1,1);
+                Lcd_Write_String("Distance= ");
+                Lcd_Set_Cursor(1,14);
+                Lcd_Write_Char(a%10+48);
+                a=a/10;
+                Lcd_Set_Cursor(1,13);
+                Lcd_Write_Char(a%10+48);
+                a=a/10;
+                Lcd_Set_Cursor(1,12);
+                Lcd_Write_Char(a%10+48); 
+                Lcd_Set_Cursor(1,15);
+                Lcd_Write_String("cm");
+                __delay_ms(500);
+            }
+            else
+            {
+                Lcd_Clear();
+                Lcd_Write_String(" Out of range");
+                __delay_ms(400);
+            }
+
+    }
+        else
+        {
+            RB3=0;
+            RB4=1;
+            Lcd_Clear();
+            Lcd_Set_Cursor(1,1);
+            Lcd_Write_String("System OFF");
+            __delay_ms(300);
+            Lcd_Clear();
+        }
+ }
+}
+```
+- The system continuously checks the state of RB2 (the ON/OFF switch):
+- - If RB2 == 1 (ON), the radar system activates.
+  - If RB2 == 0 (OFF), the radar system is turned off.
+- When the System is ON (RB2 == 1):
+- - Green LED (RB3) turns ON.
+  - Red LED (RB4) turns OFF.
+- The trigger pin (RB0) sends a 10-microsecond pulse to the ultrasonic sensor to initiate the distance measurement process
+- The echo pin (RB1) waits for the return pulse from the ultrasonic sensor.
+- The timer (TMR1) starts when the pulse is sent and stops when the echo is received.
+- The distance is calculated using the formula: D = Timer Value / 58.82
+- The timer value (TMR1L | (TMR1H << 8)) is combined to calculate the elapsed time of the echo pulse.
+- If the distance is between 2 cm and 400 cm:
+-  - The distance is displayed on the LCD in centimeters.
+   - Else the object is out of range.
+- When the System is OFF (RB2 == 0)
+- - Red LED (RB4) turns ON.
+  - Green LED (RB3) turns OFF.
+
+### Simulation Result
+
+![Radar Result](4.png)
+
+## Motion System
+### Schematic
+
+![Motion](5.png)
+
+A submarine's motion system controls its movement and direction underwater, combining propulsion systems (diesel engines, electric motors, or nuclear reactors) with control surfaces like rudders, hydroplanes, and stabilizers to adjust depth, pitch, and roll. These systems are managed through a mix of manual and automated controls, supported by computers that adapt to environmental factors such as currents and temperature.
+
+A described system utilizes a PIC16F877A microcontroller as the central control unit. It manages a DC motor for propulsion and four servo motors for controlling paddles to adjust direction and depth. An ultrasonic sensor measures the distance from the seafloor, and the microcontroller processes this data to navigate the submarine. This design is suitable for underwater exploration, surveillance, and research, emphasizing maneuverability and safety in varying conditions
+
+### Code
 
 
 
