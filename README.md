@@ -306,6 +306,179 @@ A described system utilizes a PIC16F877A microcontroller as the central control 
 
 ### Code
 
+### Header and Preprocessor Directives
+
+```c
+#include<stdio.h>
+#include<stdlib.h>
+#include<pic16f877a.h>
+#include<xc.h>
+#define _XTAL_FREQ 4000000
+#define RS RD2
+#define EN RD3
+#define D4 RD4
+#define D5 RD5
+#define D6 RD6
+#define D7 RD7
+#include "lcd.h"
+#include "adc.h"
+#include "delay.h"
+#include "pwm.h"
+#include "stdutils.h"
+```
+
+### I/O Configuration
+
+```c
+    TRISB0=0; // Configure RB0 as output (Trigger for ultrasonic sensor)
+    TRISB1=1; // Configure RB1 as input (Echo for ultrasonic sensor)
+    TRISC1;   // Configure RC1 as input (ON/OFF switch)
+    TRISB2=0; // Configure RB2 as output (Green LED)
+    TRISB3=0; // Configure RB3 as output (Red LED)
+    TRISD=0;  // Configure all PORTD pins as outputs (LCD configuration)
+    TRISD0=0; // Configure RD0 as output (Status indicator)
+    TRISA0=1; // Configure RA0 as input (ADC channel 0)
+    TRISA1=1; // Configure RA1 as input (ADC channel 1)
+    TRISC1=0; // Configure RC1 as output
+    TRISC2=0; // Configure RC2 as output
+```
+- Configures the TRIS registers to set I/O directions: 0 for output, 1 for input.
+- Pins are assigned for ultrasonic sensor, LEDs, LCD, ADC inputs, and control signals.
+
+### Peripheral Initialization
+
+```c
+    PWM_Init(0);
+    PWM_Init(1);
+    ADC_Init();
+```
+- PWM_Init(0) and PWM_Init(1): Initialize PWM channels 0 and 1 for motor control.
+- ADC_Init(): Initialize the ADC module to read analog input values.
+
+### Variable declarations
+
+```c
+    long a, b, pwmValue0, pwmValue1;
+    int c;
+```
+### Initial Setup
+
+```c
+    RD0=0; // Turn OFF status indicator
+    RB2=0; // Turn OFF green LED
+    RB3=1; // Turn ON red LED
+    RC0=0; // Initialize RC0 as OFF
+    RC4=0; // Initialize RC4 as OFF
+    Lcd_Init(); // Initialize LCD
+    Lcd_Set_Cursor(1,1);
+    Lcd_Write_String("System is OFF");
+    T1CON=0x10; // Timer1 control register (Prescaler = 1:2, Timer1 off)
+```
+- Initializes LEDs and status indicators.
+- Sets up Timer1 for measuring ultrasonic echo response time.
+- Displays "System is OFF" on the LCD.
+
+### Boot Check
+
+```c
+    if(RC4==1)
+    {
+      Lcd_Clear();
+      Lcd_Set_Cursor(1,1);
+      Lcd_Write_String("Booting Up");
+      __delay_ms(500);
+      Lcd_Clear();  
+    }
+```
+- Checks if RC4 (ON/OFF switch) is ON.
+- Displays "Booting Up" message for a delay of 500 ms.
+
+### Main Loop
+
+```c
+    while(1)
+```
+#### System ON Logic
+
+```c
+        if(RC4==1)
+```
+- If the ON/OFF switch (RC4) is ON:
+
+#### 1. Activate LEDs and Engine:
+```c
+       RB2=1;   // Green LED ON
+       RB3=0;   // Red LED OFF
+       RD0=1;   // Status indicator ON
+```
+
+#### 2. Display Status:
+```c
+       Lcd_Set_Cursor(1,1);
+       Lcd_Write_String("ENGINE ON");
+       __delay_ms(200);
+       Lcd_Clear();
+```
+
+#### 3. Read ADC Values:
+```c
+       a=ADC_GetAdcValue(0); // Read channel 0
+       b=ADC_GetAdcValue(1); // Read channel 1
+```
+
+#### 4. Calculate PWM Duty Cycles:
+```c
+       pwmValue0=a*100/1023;
+       pwmValue1=b*100/1023;
+       PWM_SetDutyCycle(1,pwmValue0); // Set duty cycle for PWM channel 1
+       PWM_SetDutyCycle(0,pwmValue1); // Set duty cycle for PWM channel 0
+```
+
+#### 5. Ultrasonic Sensor Measurement:
+```c
+       TMR1H=0;
+       TMR1L=0;
+       RB0=1;               // Send trigger pulse
+       __delay_us(10);
+       RB0=0;
+       TMR1ON=1;            // Start Timer1
+       while(RB1);          // Wait for echo response
+       TMR1ON=0;            // Stop Timer1
+       c=(TMR1L|(TMR1H<<8));// Calculate echo duration
+       c=c/58.82;           // Convert to distance in cm
+```
+
+#### 6. Display Altitude:
+```c
+       Lcd_Set_Cursor(2,1);
+       Lcd_Write_String("Altitude:");
+       Lcd_Set_Cursor(2,12);
+       Lcd_Write_Char(c%10+48); // Extract and display digits
+       c=c/10;
+       Lcd_Write_Char(c%10+48);
+       c=c/10;
+       Lcd_Write_Char(c%10+48);
+       Lcd_Set_Cursor(2,15);
+       Lcd_Write_String("m");
+```
+
+#### System OFF 
+```c
+        else if(RC4==0)
+        {
+            RB2=0; // Green LED OFF
+            RB3=1; // Red LED ON
+            RD0=0; // Status indicator OFF
+            Lcd_Clear();
+            Lcd_Set_Cursor(1,1);
+            Lcd_Write_String("System is OFF");
+        }
+```
+## Simulation Result
+
+![Motion result](6.png)
+
+
 
 
 ​
