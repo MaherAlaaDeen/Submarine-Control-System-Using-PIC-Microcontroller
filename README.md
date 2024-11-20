@@ -648,9 +648,210 @@ void main()
 }
 ```
 
-## Simulation result
+### Simulation result
 
 ![Threat Result](8.png)
+
+## Internal Condition Monitoring System
+### Schematic
+
+![Internal](9.png)
+
+The internal systems of a submarine are complex and interconnected, combining electrical, mechanical, and hydraulic systems to ensure the safety and effectiveness of the crew. These systems include propulsion, navigation, life support, and monitoring systems for tracking parameters such as depth, temperature, and power consumption. Safety mechanisms, like emergency blow systems, are in place to quickly surface the submarine in emergencies. The crew undergoes extensive training and follows emergency protocols to operate these systems effectively. Submarine system design and maintenance are critical for safety, with rigorous testing and inspection to ensure reliability.
+
+A schematic for a gas leakage and fire detection system using a PIC16F877A microcontroller is also discussed. This system includes sensors for gas and flame detection, a switch for system control, LED indicators for oil level, a pump for filling the tank, and an LCD for displaying system data. Such systems are vital in industrial environments to ensure safety by detecting potential hazards like gas leaks or fires, and they undergo strict testing to ensure reliability.
+
+### Code
+#### Header Files and Definitions:
+```c
+#include<stdio.h>
+#include<stdlib.h>
+#include<pic16f877a.h>
+#include<xc.h>
+#define _XTAL_FREQ 4000000
+#include "adc.h"
+#include "delay.h"
+#include "lcd.h"
+#include "stdutils.h"
+#include "math.h"
+#define RS RD2
+#define EN RD3
+#define D4 RD4
+#define D5 RD5
+#define D6 RD6
+#define D7 RD7
+```
+
+#### Main Function and Initial Setup:
+```c
+void main()
+{
+    TRISA0=1;  // LM35 sensor input
+    TRISA1=1;  // Gas sensor input
+    TRISA2=1;  // Flame sensor input
+    TRISD=0;   // LCD configuration pins as output
+    RD0=0;     // Pump initially OFF
+    TRISB2=1;  // Button to turn system ON/OFF
+    TRISB3=0;  // Green LED output
+    TRISB4=0;  // Red LED output
+    TRISC0=0;
+    TRISC1=0;
+    TRISC2=0;
+    TRISC3=0;
+    TRISC4=0;  // Sprinkler output
+    RC4=0;     // Sprinkler OFF
+    RB3=0;     // Green LED OFF
+    RB4=1;     // Red LED ON
+    RD0=0;     // Pump OFF
+    TRISB0=0;  // Trigger pin for ultrasonic sensor
+    TRISB1=1;  // Echo pin for ultrasonic sensor
+```
+- TRIS registers configure the pins as input (1) or output (0).
+- RD0 (Pump) is initially set OFF.
+- TRISB2 is configured to control the system's ON/OFF.
+- TRISB3 and TRISB4 control the LEDs (green and red).
+- RC4 controls the sprinkler.
+- RB0, RB1 are configured for the ultrasonic sensor (trigger and echo pins).
+
+#### LCD Initialization
+```c
+    int a;
+    Lcd_Init();
+    Lcd_Set_Cursor(1,1);
+    Lcd_Write_String("SYSTEM OFF");
+    ADC_Init();  // Initialize ADC
+    float b;
+    int c;
+    int temp;
+```
+
+#### Timer
+```c
+    T1CON=0x10;  // Set Timer1 to use the internal clock and configure prescaler
+```
+
+#### Main Loop:
+```c
+    while(1)
+    {
+        if(RB2==1)  // If button to turn system ON is pressed
+        {
+            RB3=1;   // Turn on Green LED
+            RB4=0;   // Turn off Red LED
+            TMR1H=0;  // Clear Timer1 high byte
+            TMR1L=0;  // Clear Timer1 low byte
+            RB0=1;    // Trigger ultrasonic sensor
+            __delay_us(10);  // Wait for 10 microseconds
+            RB0=0;    // Turn off the trigger
+            TMR1ON=1; // Start Timer1
+            Lcd_Clear();
+            while(RB1);  // Wait until Echo pin goes low
+            TMR1ON=0;  // Stop Timer1
+```
+- RB2 turns the system on.
+- TMR1 measures time for the ultrasonic sensor (to calculate distance).
+- The ultrasonic sensor sends a pulse and waits for the echo, measuring the time it takes to return.
+
+#### Distance Calculation and Temperature Reading:
+```c
+            a = (TMR1L | (TMR1H << 8));  // Read Timer1 value
+            a = a / 58.82;  // Convert timer value to distance in cm
+            b = ADC_GetAdcValue(0);  // Get analog value from LM35 temperature sensor
+            temp = ((b * 5) / 1023) * 100;  // Convert ADC value to temperature in Celsius
+            c = round(temp);  // Round the temperature value
+            c = c - 1;  // Subtract 1 to adjust the value
+```
+- a holds the measured distance based on the ultrasonic sensor's time.
+- b is the temperature reading from the LM35 sensor.
+- temp converts the ADC value to a temperature in Celsius.
+
+#### Display Temperature on LCD:
+```c
+            Lcd_Clear();
+            Lcd_Set_Cursor(1,1);
+            Lcd_Write_String("Temp= ");
+            Lcd_Set_Cursor(1,8);
+            Lcd_Write_Char(temp % 10 + 48);  // Display tens digit of temperature
+            temp = temp / 10;
+            Lcd_Set_Cursor(1,7);
+            Lcd_Write_Char(temp % 10 + 48);  // Display ones digit of temperature
+            temp = temp / 10;
+            Lcd_Set_Cursor(1,10);
+            Lcd_Write_String("C");
+            __delay_ms(300);
+```
+
+#### Actuate Pump Based on Distance: 
+```c
+            if(a > 400)  // Distance too far
+            {
+                RC0 = 1; RC1 = 1; RC2 = 1; RC3 = 1;  // Turn on all actuators
+                RD0 = 0;  // Turn off the pump
+                __delay_us(300);
+                Lcd_Clear();
+            }
+            if(a > 300 && a < 400)  // Medium distance
+            {
+                RC0 = 1; RC1 = 1; RC2 = 1; RC3 = 0;  // Activate specific actuators
+                __delay_us(300);
+            }
+            if(a > 200 && a < 300)  // Close distance
+            {
+                RC0 = 1; RC1 = 1; RC2 = 0; RC3 = 0;  // Activate fewer actuators
+                __delay_us(300);
+            }
+            if(a < 100)  // Too close
+            {
+                RC0 = 1; RC1 = 0; RC2 = 0; RC3 = 0;  // Activate the pump
+                RD0 = 1;
+                Lcd_Set_Cursor(2,1);
+                Lcd_Write_String("Pump is ON");
+                __delay_us(300);
+            }
+```
+#### Gas Leakage and Fire Detection
+```c
+            if(RB5 == 1)  // If gas sensor detects leakage
+            {
+                Lcd_Set_Cursor(2,1);
+                Lcd_Write_String("GAS LEACKAGE");
+                __delay_ms(500);
+            }
+            if(RB6 == 1)  // If flame sensor detects fire
+            {
+                Lcd_Set_Cursor(2,1);
+                Lcd_Write_String("Fire is Detected");
+                RC4 = 1;  // Activate sprinkler
+                __delay_ms(500);
+            }
+            if(RB6 == 0)  // Fire detected condition is cleared
+            {
+                RC4 = 0;  // Deactivate sprinkler
+            }
+        }
+        else  // If system is off
+        {
+            Lcd_Clear();
+            Lcd_Set_Cursor(1,1);
+            Lcd_Write_String("SYSTEM OFF");
+            RB3 = 0;  // Turn off Green LED
+            RB4 = 1;  // Turn on Red LED
+            RD0 = 0;  // Turn off pump
+        }
+    }
+}
+```
+- RB5 checks for gas leakage and shows a message.
+- RB6 checks for fire and triggers a sprinkler (RC4).
+- If the system is off (RB2 not pressed), the LCD displays "SYSTEM OFF," and the pump and LEDs are turned off.
+
+### Simulation Result
+
+![Internal Result](10.png)
+
+
+
+
 
 
 
